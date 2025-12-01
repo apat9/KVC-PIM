@@ -7,6 +7,8 @@ target_sources(
   pim_ir.h
   data_space.h
   nest_analysis.h
+  kv_cache_policy.h
+  static_weight_loader.h
 
   impl/fimdram.cpp
   impl/fimdram.h
