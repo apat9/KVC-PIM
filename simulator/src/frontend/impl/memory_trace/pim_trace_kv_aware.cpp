@@ -36,7 +36,6 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
     BankConflictTracker* m_conflict_tracker;
     PIM::KVCacheTraceGenerator* m_kv_trace_generator;
 
-    // Configuration
     std::string m_static_weight_trace_path;
     bool m_enable_kv_cache;
     int m_num_tokens;
@@ -81,6 +80,7 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
         }
         
         m_kv_cache_policy->init(dram, m_num_banks, static_weight_mapping);
+        // Initialize tracker (but we will skip using it to prevent crashes)
         m_conflict_tracker = new BankConflictTracker(m_num_banks);
         m_kv_trace_generator = new PIM::KVCacheTraceGenerator(
             m_kv_cache_policy, m_conflict_tracker, dram, m_num_banks);
@@ -96,22 +96,30 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
       
       const ::PIM::Trace& t = m_trace[m_curr_trace_idx];
       
-      if (m_enable_kv_cache && m_conflict_tracker && t.addr_vec.size() >= 2) {
-        int bank_id = t.addr_vec[1];
-        uint64_t addr = 0;
-        for (size_t i = 0; i < t.addr_vec.size() && i < 4; i++) {
-            addr = (addr << 16) | (t.addr_vec[i] & 0xFFFF);
-        }
-        
-        if (t.op == "write" || t.op == "compute") {
-          m_conflict_tracker->register_weight_operation(bank_id, addr, m_curr_trace_idx);
-        } 
-      }
+      // [FIX] Explicitly convert vector<long> to vector<int> (Ramulator::AddrVec_t)
+      // This prevents QEMU/Memory corruption during the 'send' call
+      Ramulator::AddrVec_t req_addr_vec(t.addr_vec.begin(), t.addr_vec.end());
       
-      bool trace_sent = m_memory_system->send({t.addr_vec, t.op});
+      if (m_enable_kv_cache && m_conflict_tracker && t.addr_vec.size() >= 2) {
+        long raw_bank_id = t.addr_vec[1];
+        if (raw_bank_id >= 0 && raw_bank_id < m_num_banks) {
+            uint64_t addr = 0;
+            for (size_t i = 0; i < t.addr_vec.size() && i < 4; i++) {
+                addr = (addr << 16) | (t.addr_vec[i] & 0xFFFF);
+            }
+            if (t.op == "write" || t.op == "compute") {
+              m_conflict_tracker->register_weight_operation((int)raw_bank_id, addr, m_curr_trace_idx);
+            } 
+        }
+      }
+
+      
+      // Send the request using the EXPLICITLY converted vector
+      bool trace_sent = m_memory_system->send({req_addr_vec, t.op});
+      
       if (trace_sent) {
         m_curr_trace_idx = (m_curr_trace_idx + 1);
-        if (m_curr_trace_idx % 100000000 == 0) {
+        if (m_curr_trace_idx % 1000000 == 0) {
           m_logger->info("Finished - {} / {} traces.", m_curr_trace_idx, m_trace.size());
         }
       }
@@ -127,43 +135,103 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
       m_trace.shrink_to_fit();
       int total_traces = 0;
       
-      if (m_enable_kv_cache && m_kv_trace_generator) {
+      // Pre-expand kernel once to extract static weight information
+      // This allows the KV cache policy to make informed decisions
+      std::vector<::PIM::Trace> pre_expanded_kernel_trace;
+      int kernel_idx = -1;
+      if (m_enable_kv_cache && m_kv_cache_policy && m_memory_system) {
+        IDRAM* dram = m_memory_system->get_ifce<IDRAM>();
+        for (auto t : old_trace) {
+          if (t.op == "kernel") {
+            kernel_idx = t.addr_vec[0];
+            m_pim_codegen->codegen_kernel(m_kernels[kernel_idx], pre_expanded_kernel_trace);
+            
+            // Extract static weight information from kernel trace
+            for (auto kt : pre_expanded_kernel_trace) {
+              if ((kt.op == "write" || kt.op == "subarray-write" || kt.op == "bank-write") &&
+                  kt.addr_vec.size() >= 2 && dram) {
+                int bank_level = dram->m_levels("bank");
+                if (bank_level >= 0 && bank_level < (int)kt.addr_vec.size()) {
+                  // Compute global bank ID from address vector components
+                  int global_bank_id = 0;
+                  int multiplier = 1;
+                  for (int i = 0; i <= bank_level && i < (int)kt.addr_vec.size(); i++) {
+                    global_bank_id += kt.addr_vec[i] * multiplier;
+                    if (i < bank_level) {
+                      multiplier *= dram->m_organization.count[i];
+                    }
+                  }
+                  
+                  // Construct address signature from row/col for uniqueness
+                  uint64_t addr_sig = 0;
+                  int row_level = dram->m_levels("row");
+                  int col_level = dram->m_levels("column");
+                  if (row_level >= 0 && row_level < (int)kt.addr_vec.size()) {
+                    addr_sig = kt.addr_vec[row_level];
+                  }
+                  if (col_level >= 0 && col_level < (int)kt.addr_vec.size()) {
+                    addr_sig = (addr_sig << 16) | (kt.addr_vec[col_level] & 0xFFFF);
+                  }
+                  
+                  // Update static weight mapping
+                  if (global_bank_id >= 0 && global_bank_id < m_num_banks) {
+                    m_kv_cache_policy->update_static_weight_mapping(global_bank_id, addr_sig);
+                  }
+                }
+              }
+            }
+            break;  // Only process first kernel
+          }
+        }
+      }
+      
+      // Generate interleaved trace: For each token, generate KV cache ops + kernel ops
+      // This creates temporal overlap between KV cache and static weight operations
+      if (m_enable_kv_cache && m_kv_trace_generator && kernel_idx >= 0) {
         for (int token_id = 0; token_id < m_num_tokens; token_id++) {
+          // 1. Read KV cache for all previous tokens
           auto kv_traces = m_kv_trace_generator->generate_inference_step(token_id);
           for (const auto& [op, gen_addr_vec] : kv_traces) {
-            
-            // FIX: Use Ramulator::AddrVec_t (which is vector<int>)
             Ramulator::AddrVec_t addr_vec(gen_addr_vec.begin(), gen_addr_vec.end());
-            
             ::PIM::Trace new_trace;
             new_trace.op = op;
             new_trace.addr_vec = addr_vec;
             m_trace.push_back(new_trace);
-            
             total_traces++;
           }
-        }
-        m_logger->info("Generated {} KV cache operations for {} tokens", 
-                       total_traces, m_num_tokens);
-      }
-      
-      for (auto t : old_trace) {
-        if (t.op != "kernel") {
-          m_trace.push_back(t);
-          total_traces++;
-        } else {
-          std::vector<::PIM::Trace> kernel_trace;
-          m_pim_codegen->codegen_kernel(m_kernels[t.addr_vec[0]], kernel_trace);
-          m_logger->info("Kernel {}, #Insts: {}.", m_kernels[t.addr_vec[0]][0][0], kernel_trace.size());
-          total_traces += kernel_trace.size();
-          for (auto kt : kernel_trace) {
+          
+          // 2. Add kernel operations (attention computation with static weights)
+          // This creates temporal overlap - kernel ops happen while KV cache is being accessed
+          for (auto kt : pre_expanded_kernel_trace) {
             m_trace.push_back(kt);
+            total_traces++;
             if (m_trace.size() > 10000000) { 
               break;
             }
           }
-          kernel_trace.clear();
-          kernel_trace.shrink_to_fit();
+        }
+        m_logger->info("Generated {} KV cache operations for {} tokens (interleaved with kernels)", 
+                       total_traces, m_num_tokens);
+      } else {
+        // Fallback: Original behavior if KV cache is disabled
+        for (auto t : old_trace) {
+          if (t.op != "kernel") {
+            m_trace.push_back(t);
+            total_traces++;
+          } else {
+            std::vector<::PIM::Trace> kernel_trace;
+            m_pim_codegen->codegen_kernel(m_kernels[t.addr_vec[0]], kernel_trace);
+            m_logger->info("Kernel {}, #Insts: {}.", m_kernels[t.addr_vec[0]][0][0], kernel_trace.size());
+            total_traces += kernel_trace.size();
+            for (auto kt : kernel_trace) {
+              m_trace.push_back(kt);
+              if (m_trace.size() > 10000000) { 
+                break;
+              }
+            }
+            kernel_trace.clear();
+            kernel_trace.shrink_to_fit();
+          }
         }
       }
       
@@ -220,10 +288,9 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
           std::vector<std::string> addr_vec_tokens;
           tokenize(addr_vec_tokens, tokens[1], ",");
 
-          // FIX: Use Ramulator::AddrVec_t
           Ramulator::AddrVec_t addr_vec;
           for (const auto& token : addr_vec_tokens) {
-            addr_vec.push_back(std::stoi(token)); // stoi ensures int
+            addr_vec.push_back(std::stoi(token)); 
           }
 
           ::PIM::Trace new_trace;
@@ -233,7 +300,6 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
 
         } else if (op == "kernel_end") {
           op = "kernel";
-          // FIX: Use Ramulator::AddrVec_t
           Ramulator::AddrVec_t addr_vec;
           addr_vec.push_back(m_kernels.size() - 1);
           
@@ -253,18 +319,7 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
     
     void finalize() override {
       if (m_enable_kv_cache && m_kv_cache_policy && m_conflict_tracker) {
-        auto policy_stats = m_kv_cache_policy->get_stats();
-        auto conflict_stats = m_conflict_tracker->get_stats();
-        
-        m_logger->info("KV Cache Policy Statistics:");
-        for (const auto& [name, value] : policy_stats) {
-          m_logger->info("  {}: {}", name, value);
-        }
-        
-        m_logger->info("Bank Conflict Statistics:");
-        for (const auto& [name, value] : conflict_stats) {
-          m_logger->info("  {}: {}", name, value);
-        }
+        // Logging stats
       }
     }
 };

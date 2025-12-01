@@ -44,6 +44,35 @@ public:
   }
 
   /**
+   * @brief Convert global bank_id to address vector components
+   * 
+   * @param global_bank_id Global bank ID (0 to num_banks-1)
+   * @return Address vector with proper DRAM hierarchy
+   */
+  std::vector<uint64_t> bank_id_to_addr_vec(int global_bank_id) {
+    if (!m_dram || global_bank_id < 0 || global_bank_id >= m_num_banks) {
+      // Return empty vector if invalid
+      return std::vector<uint64_t>();
+    }
+    
+    // Create address vector with correct size for DRAM hierarchy
+    std::vector<uint64_t> addr_vec(m_dram->m_levels.size(), 0);
+    
+    // Decompose global bank_id into hierarchy components
+    int bank_level = m_dram->m_levels("bank");
+    int bank_id = global_bank_id;
+    
+    // Map bank_id through the hierarchy (channel, rank, bankgroup, bank)
+    for (int j = bank_level; j >= 0; j--) {
+      int id = bank_id % m_dram->m_organization.count[j];
+      bank_id /= m_dram->m_organization.count[j];
+      addr_vec[j] = id;
+    }
+    
+    return addr_vec;
+  }
+
+  /**
    * @brief Generate KV cache write operation for a new token
    * 
    * @param token_id Token ID (0 for prompt, 1+ for generated tokens)
@@ -63,16 +92,26 @@ public:
     
     m_token_to_bank[token_id] = bank_id;
     
+    // Get base address vector for this bank
+    std::vector<uint64_t> base_addr_vec = bank_id_to_addr_vec(bank_id);
+    if (base_addr_vec.empty()) {
+      return traces;  // Invalid bank_id
+    }
+    
     // Generate write operations for K and V cache
     // For simplicity, we write to consecutive rows in the allocated bank
     int num_rows = (kv_data_size + 8192 - 1) / 8192;  // Assuming 8KB per row
+    int row_level = m_dram->m_levels("row");
+    int col_level = m_dram->m_levels("column");
     
     for (int row = 0; row < num_rows; row++) {
-      std::vector<uint64_t> addr_vec;
-      addr_vec.push_back(0);  // channel (assume single channel for now)
-      addr_vec.push_back(bank_id);
-      addr_vec.push_back(row);  // row
-      addr_vec.push_back(0);    // column
+      std::vector<uint64_t> addr_vec = base_addr_vec;
+      if (row_level >= 0 && row_level < (int)addr_vec.size()) {
+        addr_vec[row_level] = row;
+      }
+      if (col_level >= 0 && col_level < (int)addr_vec.size()) {
+        addr_vec[col_level] = 0;
+      }
       
       traces.push_back({"write", addr_vec});
     }
@@ -91,21 +130,36 @@ public:
     
     std::vector<std::pair<std::string, std::vector<uint64_t>>> traces;
     
+    if (!m_dram) {
+      return traces;  // DRAM not initialized
+    }
+    
+    int row_level = m_dram->m_levels("row");
+    int col_level = m_dram->m_levels("column");
+    
     for (int token_id : token_ids) {
       int bank_id = m_kv_cache_policy->get_kv_cache_bank(token_id);
       if (bank_id < 0) {
         continue;  // Token not found
       }
       
+      // Get base address vector for this bank
+      std::vector<uint64_t> base_addr_vec = bank_id_to_addr_vec(bank_id);
+      if (base_addr_vec.empty()) {
+        continue;  // Invalid bank_id
+      }
+      
       // Generate read operations for this token's KV cache
       int num_rows = (m_kv_cache_block_size + 8192 - 1) / 8192;
       
       for (int row = 0; row < num_rows; row++) {
-        std::vector<uint64_t> addr_vec;
-        addr_vec.push_back(0);  // channel
-        addr_vec.push_back(bank_id);
-        addr_vec.push_back(row);  // row
-        addr_vec.push_back(0);    // column
+        std::vector<uint64_t> addr_vec = base_addr_vec;
+        if (row_level >= 0 && row_level < (int)addr_vec.size()) {
+          addr_vec[row_level] = row;
+        }
+        if (col_level >= 0 && col_level < (int)addr_vec.size()) {
+          addr_vec[col_level] = 0;
+        }
         
         traces.push_back({"read", addr_vec});
       }

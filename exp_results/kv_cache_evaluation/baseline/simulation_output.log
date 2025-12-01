@@ -3,8 +3,3 @@
 [PimDRAMSystem] channels: 16, PEs/channel: 16, SysBW: 256 bits/cycle, PEBW: 256 bits/cycle, burst length: 4
 [Ramulator::PIM Trace KV-Aware] [info] Loaded static weight mapping from /root/KVC-PIM/Result/Group.txt
 [Ramulator::PIM Trace KV-Aware] [info] KV cache policy initialized with 256 banks
-[Ramulator::PIM Trace KV-Aware] [info] Generated 392960 KV cache operations for 512 tokens
-SimTimeSteps:4608, TotalSteps:4608
-[Ramulator::PIM Trace KV-Aware] [info] Kernel gemm, #Insts: 599040.
-[Ramulator::PIM Trace KV-Aware] [info] After kernel expansion - 992000 / 992000 lines.
-qemu: uncaught target signal 11 (Segmentation fault) - core dumped

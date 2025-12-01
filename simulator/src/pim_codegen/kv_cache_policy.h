@@ -28,6 +28,7 @@ public:
   virtual int allocate_kv_cache_bank(size_t kv_cache_size, int token_id) = 0;
   virtual int get_kv_cache_bank(int token_id) = 0;
   virtual bool has_bank_conflict(int bank_id) = 0;
+  virtual void update_static_weight_mapping(int bank_id, uint64_t addr) = 0;
   virtual std::map<std::string, int64_t> get_stats() = 0;
   virtual void reset_stats() = 0;
 
@@ -89,6 +90,10 @@ public:
   bool has_bank_conflict(int bank_id) override {
     auto it = m_static_weight_mapping.find(bank_id);
     return (it != m_static_weight_mapping.end() && !it->second.empty());
+  }
+
+  void update_static_weight_mapping(int bank_id, uint64_t addr) override {
+    // Naive policy doesn't need to track static weights dynamically
   }
 
   std::map<std::string, int64_t> get_stats() override {
@@ -176,6 +181,10 @@ public:
     return false;
   }
 
+  void update_static_weight_mapping(int bank_id, uint64_t addr) override {
+    // Bank partitioning doesn't need to track static weights dynamically
+  }
+
   std::map<std::string, int64_t> get_stats() override {
     return {
       {"total_allocations", m_total_allocations},
@@ -203,6 +212,8 @@ private:
   std::map<int, int> m_token_to_bank;
   std::map<int, std::unordered_set<uint64_t>> m_static_weight_mapping;
   std::vector<int> m_bank_weight_count;
+  std::vector<int> m_bank_kv_cache_count;  // Track KV cache allocations per bank
+  int m_next_tiebreak_bank;  // For tie-breaking when all banks have equal scores
   
   int64_t m_total_allocations;
   int64_t m_total_conflicts;
@@ -219,12 +230,14 @@ public:
     m_static_weight_mapping = static_weight_mapping;
     
     m_bank_weight_count.resize(num_banks, 0);
+    m_bank_kv_cache_count.resize(num_banks, 0);
     for (const auto& [bank_id, weight_addrs] : static_weight_mapping) {
       if (bank_id >= 0 && bank_id < num_banks) {
         m_bank_weight_count[bank_id] = weight_addrs.size();
       }
     }
     
+    m_next_tiebreak_bank = 0;
     m_total_allocations = 0;
     m_total_conflicts = 0;
     
@@ -236,19 +249,41 @@ public:
   }
 
   int allocate_kv_cache_bank(size_t kv_cache_size, int token_id) override {
+    // Score banks based on: static weight count + existing KV cache allocations
+    // Lower score = better (less contention)
     int best_bank = -1;
-    int min_weight_count = std::numeric_limits<int>::max();
+    int best_score = std::numeric_limits<int>::max();
+    std::vector<int> candidate_banks;  // Banks with the best score
     
     for (int bank_id = 0; bank_id < m_num_banks; bank_id++) {
-      if (m_bank_weight_count[bank_id] < min_weight_count) {
-        min_weight_count = m_bank_weight_count[bank_id];
-        best_bank = bank_id;
+      // Score = static weight count + existing KV cache count
+      // Weight static weights more heavily (multiply by 2) since they're persistent
+      int score = m_bank_weight_count[bank_id] * 2 + m_bank_kv_cache_count[bank_id];
+      
+      if (score < best_score) {
+        best_score = score;
+        candidate_banks.clear();
+        candidate_banks.push_back(bank_id);
+      } else if (score == best_score) {
+        candidate_banks.push_back(bank_id);
       }
     }
     
-    if (best_bank == -1) best_bank = 0;
+    // Tie-breaking: if multiple banks have the same score, use round-robin
+    if (candidate_banks.empty()) {
+      best_bank = 0;  // Fallback
+    } else if (candidate_banks.size() == 1) {
+      best_bank = candidate_banks[0];
+    } else {
+      // Round-robin tie-breaking among candidates
+      int candidate_idx = m_next_tiebreak_bank % candidate_banks.size();
+      best_bank = candidate_banks[candidate_idx];
+      m_next_tiebreak_bank = (m_next_tiebreak_bank + 1) % m_num_banks;
+    }
     
+    // Record the allocation
     m_token_to_bank[token_id] = best_bank;
+    m_bank_kv_cache_count[best_bank]++;
     m_total_allocations++;
     
     if (has_bank_conflict(best_bank)) {
@@ -268,6 +303,17 @@ public:
   bool has_bank_conflict(int bank_id) override {
     if (bank_id < 0 || bank_id >= m_num_banks) return false;
     return m_bank_weight_count[bank_id] > 0;
+  }
+
+  void update_static_weight_mapping(int bank_id, uint64_t addr) override {
+    if (bank_id >= 0 && bank_id < m_num_banks) {
+      // Update weight count if this is a new address
+      auto& weight_addrs = m_static_weight_mapping[bank_id];
+      if (weight_addrs.find(addr) == weight_addrs.end()) {
+        weight_addrs.insert(addr);
+        m_bank_weight_count[bank_id]++;
+      }
+    }
   }
 
   std::map<std::string, int64_t> get_stats() override {
