@@ -9,7 +9,7 @@ SIMULATOR_BIN="$PROJECT_ROOT/simulator/build/ramulator2"
 
 # Configuration
 MODEL="llama3-8B-128"
-NUM_TOKENS=512
+NUM_TOKENS=256
 STATIC_WEIGHT_TRACE="$PROJECT_ROOT/Result/Group.txt"
 OUTPUT_DIR="$PROJECT_ROOT/exp_results/kv_cache_evaluation/bank_partitioning"
 KV_CACHE_BANKS_COUNT=4  # Reserve 4 banks for KV cache

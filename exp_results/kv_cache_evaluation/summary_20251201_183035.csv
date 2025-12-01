@@ -1,0 +1,4 @@
+Policy,Cycles,Conflicts,Improvement_vs_Baseline
+Baseline,8019650,Trace,0%
+BankPartitioning,5854003,Trace,
+ContentionAware,8015560,Trace,

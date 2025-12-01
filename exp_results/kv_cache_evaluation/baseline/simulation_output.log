@@ -1,5 +1,210 @@
 [Ramulator::PIM Trace KV-Aware] [info] Loading trace file /root/KVC-PIM/Result/Group.txt ...
-[Ramulator::PIM Trace KV-Aware] [info] Loaded 1 lines.
+[Ramulator::PIM Trace KV-Aware] [info] Loaded 1 high-level trace lines. Starting expansion...
 [PimDRAMSystem] channels: 16, PEs/channel: 16, SysBW: 256 bits/cycle, PEBW: 256 bits/cycle, burst length: 4
-[Ramulator::PIM Trace KV-Aware] [info] Loaded static weight mapping from /root/KVC-PIM/Result/Group.txt
-[Ramulator::PIM Trace KV-Aware] [info] KV cache policy initialized with 256 banks
+[Ramulator::PIM Trace KV-Aware] [info] DRAM has 256 total banks
+[Ramulator::PIM Trace KV-Aware] [info] Loaded static weights from file: 0 banks with weights
+[Ramulator::PIM Trace KV-Aware] [info] PHASE 1: Expanding Kernels (Pre-Scan)...
+[Ramulator::PIM Trace KV-Aware] [info]   -> Expanding Kernel #1 (ID: 0)...
+SimTimeSteps:2048, TotalSteps:2048
+[Ramulator::PIM Trace KV-Aware] [info]      Generated 270336 instructions. Total: 270336
+[Ramulator::PIM Trace KV-Aware] [info] === EXPANDED TRACE DEBUG ===
+[Ramulator::PIM Trace KV-Aware] [info] Total operations: 270336
+[Ramulator::PIM Trace KV-Aware] [info] Operation distribution:
+[Ramulator::PIM Trace KV-Aware] [info]   bank-read: 131072
+[Ramulator::PIM Trace KV-Aware] [info]   read: 131072
+[Ramulator::PIM Trace KV-Aware] [info]   write: 8192
+[Ramulator::PIM Trace KV-Aware] [info] Bank operation distribution:
+[Ramulator::PIM Trace KV-Aware] [info]   Bank 0: 264192 operations [bank-read read write ]
+[Ramulator::PIM Trace KV-Aware] [info]   Bank 1: 2048 operations [write ]
+[Ramulator::PIM Trace KV-Aware] [info]   Bank 2: 2048 operations [write ]
+[Ramulator::PIM Trace KV-Aware] [info]   Bank 3: 2048 operations [write ]
+[Ramulator::PIM Trace KV-Aware] [info] Sample addresses (first 10):
+[Ramulator::PIM Trace KV-Aware] [info]   Op: 'write', Bank: 0, Addr: [0...]
+[Ramulator::PIM Trace KV-Aware] [info]   Op: 'write', Bank: 0, Addr: [0...]
+[Ramulator::PIM Trace KV-Aware] [info]   Op: 'write', Bank: 0, Addr: [0...]
+[Ramulator::PIM Trace KV-Aware] [info]   Op: 'write', Bank: 0, Addr: [0...]
+[Ramulator::PIM Trace KV-Aware] [info]   Op: 'write', Bank: 0, Addr: [0...]
+[Ramulator::PIM Trace KV-Aware] [info]   Op: 'write', Bank: 0, Addr: [0...]
+[Ramulator::PIM Trace KV-Aware] [info]   Op: 'write', Bank: 0, Addr: [0...]
+[Ramulator::PIM Trace KV-Aware] [info]   Op: 'write', Bank: 0, Addr: [0...]
+[Ramulator::PIM Trace KV-Aware] [info]   Op: 'write', Bank: 0, Addr: [0...]
+[Ramulator::PIM Trace KV-Aware] [info]   Op: 'write', Bank: 0, Addr: [0...]
+[Ramulator::PIM Trace KV-Aware] [info] PHASE 2: Building Weight Map from 270336 instructions...
+[Ramulator::PIM Trace KV-Aware] [info]   -> Bank operation statistics:
+[Ramulator::PIM Trace KV-Aware] [info]      Bank 0: 264192 total operations [bank-read read write ]
+[Ramulator::PIM Trace KV-Aware] [info]      Bank 1: 2048 total operations [write ]
+[Ramulator::PIM Trace KV-Aware] [info]      Bank 2: 2048 total operations [write ]
+[Ramulator::PIM Trace KV-Aware] [info]      Bank 3: 2048 total operations [write ]
+[Ramulator::PIM Trace KV-Aware] [info]   -> Final weight map: 8192 unique weight addresses in 4 banks
+[Ramulator::PIM Trace KV-Aware] [info]   -> Weight banks (avoid for KV cache):
+[Ramulator::PIM Trace KV-Aware] [info]      Bank 0: 2048 weight addresses
+[Ramulator::PIM Trace KV-Aware] [info]      Bank 1: 2048 weight addresses
+[Ramulator::PIM Trace KV-Aware] [info]      Bank 2: 2048 weight addresses
+[Ramulator::PIM Trace KV-Aware] [info]      Bank 3: 2048 weight addresses
+[Ramulator::PIM Trace KV-Aware] [info] === KV CACHE POLICY CONFIGURATION ===
+[Ramulator::PIM Trace KV-Aware] [info]   Total banks: 256
+[Ramulator::PIM Trace KV-Aware] [info]   Weight banks: 4
+[Ramulator::PIM Trace KV-Aware] [info]   KV tokens to allocate: 256
+[Ramulator::PIM Trace KV-Aware] [info]   Available banks for KV: 252
+[Ramulator::PIM Trace KV-Aware] [info] PHASE 3: Generating Trace for 256 tokens...
+[Ramulator::PIM Trace KV-Aware] [info]  -> Kernel Slice Size: 5000 ops/token
+[Ramulator::PIM Trace KV-Aware] [info]      Generating Token 0/256
+[Ramulator::PIM Trace KV-Aware] [info]      Generating Token 50/256
+[Ramulator::PIM Trace KV-Aware] [info]      Generating Token 100/256
+[Ramulator::PIM Trace KV-Aware] [info]      Generating Token 150/256
+[Ramulator::PIM Trace KV-Aware] [info]      Generating Token 200/256
+[Ramulator::PIM Trace KV-Aware] [info]      Generating Token 250/256
+[Ramulator::PIM Trace KV-Aware] [info]   -> Generated 163712 KV cache operations.
+[Ramulator::PIM Trace KV-Aware] [info] === FINAL TRACE READY: 1443712 total operations ===
+[Ramulator::PIM Trace KV-Aware] [info] === Weight Stats: 8192 ops in 4 banks ===
+[Ramulator::PIM Trace KV-Aware] [info] Progress: 1000000 / 1443712 traces
+[Ramulator::PIM Trace KV-Aware] [info] === FINAL KV CACHE POLICY STATS ===
+[Ramulator::PIM Trace KV-Aware] [info]   total_allocations: 256
+[Ramulator::PIM Trace KV-Aware] [info]   total_conflicts: 4
+[Ramulator::PIM Trace KV-Aware] [info] === WEIGHT DETECTION SUMMARY ===
+[Ramulator::PIM Trace KV-Aware] [info]   Total weight ops detected: 8192
+[Ramulator::PIM Trace KV-Aware] [info]   Unique weight banks: 4
+[Ramulator::PIM Trace KV-Aware] [info]   KV Cache conflict rate: 1.56%
+MemorySystem:
+  impl: PimDRAM
+  total_num_bkwrite_requests: 0
+  total_num_bkread_requests: 620544
+  total_num_other_requests: 620544
+  total_num_compute_requests: 0
+  total_num_write_requests: 169984
+  total_num_read_requests: 653184
+  memory_system_cycles: 8019650
+  DRAM:
+    impl: HBM3_PIM
+  AddrMapper:
+    impl: ChRaBaRoCo
+  Controller:
+    impl: PIM
+    id: Channel 0
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 1
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 2
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 3
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 4
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 5
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 6
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 7
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 8
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 9
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 10
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 11
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 12
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 13
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 14
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 15
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+
+

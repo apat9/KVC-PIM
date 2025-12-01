@@ -36,4 +36,4 @@
                     --storage-method 0 \
                     --config-arch-path ./data/hbm_pim.json \
                     --config-knobs-path ./data/knobs.json \
-                    ./nn_models/alexnet/single_layers/16banks/layerinfo.alexnet.l5.fc0.linalg.mlir
+                    ./nn_models/llama3-8B-128/single_layers/16banks/layerinfo.llama3-8b-128.l0.fc0.linalg.mlir

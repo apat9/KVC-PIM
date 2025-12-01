@@ -1,0 +1,151 @@
+[Ramulator::PIM Trace KV-Aware] [info] Loading trace file /root/KVC-PIM/Result/Group.txt ...
+[Ramulator::PIM Trace KV-Aware] [info] Loaded 1 lines.
+[PimDRAMSystem] channels: 16, PEs/channel: 16, SysBW: 256 bits/cycle, PEBW: 256 bits/cycle, burst length: 4
+[Ramulator::PIM Trace KV-Aware] [info] Loaded static weight mapping from /root/KVC-PIM/Result/Group.txt
+[Ramulator::PIM Trace KV-Aware] [info] KV cache policy initialized with 256 banks
+SimTimeSteps:1, TotalSteps:1
+[Ramulator::PIM Trace KV-Aware] [info] Generated 5450 KV cache operations for 5 tokens (interleaved with kernels)
+[Ramulator::PIM Trace KV-Aware] [info] After kernel expansion - 5450 / 5450 lines.
+MemorySystem:
+  impl: PimDRAM
+  total_num_bkwrite_requests: 0
+  total_num_bkread_requests: 160
+  total_num_other_requests: 160
+  total_num_compute_requests: 0
+  total_num_write_requests: 5120
+  total_num_read_requests: 170
+  memory_system_cycles: 106495
+  DRAM:
+    impl: HBM3_PIM
+  AddrMapper:
+    impl: ChRaBaRoCo
+  Controller:
+    impl: PIM
+    id: Channel 0
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 1
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 2
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 3
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 4
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 5
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 6
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 7
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 8
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 9
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 10
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 11
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 12
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 13
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 14
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+  Controller:
+    impl: PIM
+    id: Channel 15
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+
+
+

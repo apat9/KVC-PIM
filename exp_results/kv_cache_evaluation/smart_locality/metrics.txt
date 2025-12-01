@@ -1,2 +1,4 @@
+=== Simulation Results ===
   memory_system_cycles: 8015560
 [Ramulator::PIM Trace KV-Aware] [info]   total_conflicts: 0
+No policy stats found

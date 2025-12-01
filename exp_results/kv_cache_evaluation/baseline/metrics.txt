@@ -1,1 +1,2 @@
-  memory_system_cycles: 10048786
+  memory_system_cycles: 8019650
+[Ramulator::PIM Trace KV-Aware] [info]   total_conflicts: 4
