@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <vector>
 
 #include "frontend/frontend.h"
 #include "base/exception.h"
@@ -16,18 +17,12 @@ namespace Ramulator {
 
 namespace fs = std::filesystem;
 
-/**
- * @brief Enhanced PIM trace frontend with KV cache awareness
- * 
- * This frontend extends the base PimTrace to support KV cache placement policies
- * and bank conflict tracking for LLM inference workloads.
- */
 class PimTraceKVAware : public IFrontEnd, public Implementation {
   RAMULATOR_REGISTER_IMPLEMENTATION(IFrontEnd, PimTraceKVAware, "PimTraceKVAware", 
                                     "PIM trace with KV cache placement policy support.")
 
   private:
-    std::vector<PIM::Trace> m_trace;
+    std::vector<::PIM::Trace> m_trace;
     std::vector<std::vector<std::vector<std::string>>> m_kernels;
 
     size_t m_trace_length = 0;
@@ -35,7 +30,8 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
 
     Logger_t m_logger;
 
-    PIM::IPimCodeGen* m_pim_codegen;
+    ::PIM::IPimCodeGen* m_pim_codegen;
+    
     PIM::IKVCachePolicy* m_kv_cache_policy;
     BankConflictTracker* m_conflict_tracker;
     PIM::KVCacheTraceGenerator* m_kv_trace_generator;
@@ -51,14 +47,12 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
       std::string trace_path_str = param<std::string>("path").desc("Path to the load store trace file.").required();
       m_clock_ratio = param<uint>("clock_ratio").required();
       
-      // KV cache configuration
       m_enable_kv_cache = param<bool>("enable_kv_cache").default_val(false);
       m_static_weight_trace_path = param<std::string>("static_weight_trace_path").default_val("");
       m_num_tokens = param<int>("num_tokens").default_val(512);
       
-      m_pim_codegen = create_child_ifce<PIM::IPimCodeGen>();
+      m_pim_codegen = create_child_ifce<::PIM::IPimCodeGen>();
       
-      // Create KV cache policy if enabled
       if (m_enable_kv_cache) {
         m_kv_cache_policy = create_child_ifce<PIM::IKVCachePolicy>();
       } else {
@@ -74,14 +68,11 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
     void connect_memory_system(IMemorySystem* memory_system) override {
       IFrontEnd::connect_memory_system(memory_system);
       
-      // Initialize KV cache policy with static weight mapping
       if (m_enable_kv_cache && m_kv_cache_policy) {
         IDRAM* dram = memory_system->get_ifce<IDRAM>();
-        m_num_banks = dram->get_level_size("bank") * 
-                      dram->get_level_size("bankgroup") *
+        m_num_banks = dram->get_level_size("bank") * dram->get_level_size("bankgroup") *
                       dram->get_level_size("channel");
         
-        // Load static weight mapping from OptiPIM trace
         std::map<int, std::unordered_set<uint64_t>> static_weight_mapping;
         if (!m_static_weight_trace_path.empty()) {
           static_weight_mapping = PIM::StaticWeightLoader::extract_weight_banks(
@@ -89,13 +80,8 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
           m_logger->info("Loaded static weight mapping from {}", m_static_weight_trace_path);
         }
         
-        // Initialize KV cache policy
         m_kv_cache_policy->init(dram, m_num_banks, static_weight_mapping);
-        
-        // Initialize conflict tracker
         m_conflict_tracker = new BankConflictTracker(m_num_banks);
-        
-        // Initialize KV trace generator
         m_kv_trace_generator = new PIM::KVCacheTraceGenerator(
             m_kv_cache_policy, m_conflict_tracker, dram, m_num_banks);
         
@@ -107,25 +93,19 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
 
     void tick() override {
       if (m_curr_trace_idx > m_trace_length - 1) return;
-      const PIM::Trace& t = m_trace[m_curr_trace_idx];
       
-      // Track conflicts if KV cache is enabled
+      const ::PIM::Trace& t = m_trace[m_curr_trace_idx];
+      
       if (m_enable_kv_cache && m_conflict_tracker && t.addr_vec.size() >= 2) {
         int bank_id = t.addr_vec[1];
         uint64_t addr = 0;
         for (size_t i = 0; i < t.addr_vec.size() && i < 4; i++) {
-          addr = (addr << 16) | (t.addr_vec[i] & 0xFFFF);
+            addr = (addr << 16) | (t.addr_vec[i] & 0xFFFF);
         }
         
-        // Determine if this is a weight or KV cache operation
-        // For now, we'll use heuristics based on operation type
         if (t.op == "write" || t.op == "compute") {
-          // Could be weight operation
           m_conflict_tracker->register_weight_operation(bank_id, addr, m_curr_trace_idx);
-        } else if (t.op == "read") {
-          // Could be KV cache read
-          // We'd need metadata to distinguish, but for now track both
-        }
+        } 
       }
       
       bool trace_sent = m_memory_system->send({t.addr_vec, t.op});
@@ -139,7 +119,7 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
 
   private:
     void expand_trace() {
-      std::vector<PIM::Trace> old_trace;
+      std::vector<::PIM::Trace> old_trace;
       for (auto t : m_trace) {
         old_trace.push_back(t);
       }
@@ -147,13 +127,19 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
       m_trace.shrink_to_fit();
       int total_traces = 0;
       
-      // If KV cache is enabled, inject KV cache operations
       if (m_enable_kv_cache && m_kv_trace_generator) {
-        // Generate KV cache operations for each token
         for (int token_id = 0; token_id < m_num_tokens; token_id++) {
           auto kv_traces = m_kv_trace_generator->generate_inference_step(token_id);
-          for (const auto& [op, addr_vec] : kv_traces) {
-            m_trace.push_back({op, addr_vec});
+          for (const auto& [op, gen_addr_vec] : kv_traces) {
+            
+            // FIX: Use Ramulator::AddrVec_t (which is vector<int>)
+            Ramulator::AddrVec_t addr_vec(gen_addr_vec.begin(), gen_addr_vec.end());
+            
+            ::PIM::Trace new_trace;
+            new_trace.op = op;
+            new_trace.addr_vec = addr_vec;
+            m_trace.push_back(new_trace);
+            
             total_traces++;
           }
         }
@@ -161,13 +147,12 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
                        total_traces, m_num_tokens);
       }
       
-      // Process original trace
       for (auto t : old_trace) {
         if (t.op != "kernel") {
           m_trace.push_back(t);
           total_traces++;
         } else {
-          std::vector<PIM::Trace> kernel_trace;
+          std::vector<::PIM::Trace> kernel_trace;
           m_pim_codegen->codegen_kernel(m_kernels[t.addr_vec[0]], kernel_trace);
           m_logger->info("Kernel {}, #Insts: {}.", m_kernels[t.addr_vec[0]][0][0], kernel_trace.size());
           total_traces += kernel_trace.size();
@@ -204,26 +189,17 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
       while (std::getline(trace_file, line)) {
         std::vector<std::string> tokens;
         tokenize(tokens, line, " ");
-        if (line.empty()) {
-          continue;
-        }
+        if (line.empty()) continue;
 
         std::string op = ""; 
-        if (tokens[0] == "R") {
-          op = "read";
-        } else if (tokens[0] == "W") {
-          op = "write";
-        } else if (tokens[0] == "C") {
-          op = "compute";
-        } else if (tokens[0] == "SR") {
-          op = "subarray-read";
-        } else if (tokens[0] == "SW") {
-          op = "subarray-write";
-        } else if (tokens[0] == "BR") {
-          op = "bank-read";
-        } else if (tokens[0] == "BW") {
-          op = "bank-write";
-        } else if (tokens[0] == "conv2d" || tokens[0] == "gemm") {
+        if (tokens[0] == "R") op = "read";
+        else if (tokens[0] == "W") op = "write";
+        else if (tokens[0] == "C") op = "compute";
+        else if (tokens[0] == "SR") op = "subarray-read";
+        else if (tokens[0] == "SW") op = "subarray-write";
+        else if (tokens[0] == "BR") op = "bank-read";
+        else if (tokens[0] == "BW") op = "bank-write";
+        else if (tokens[0] == "conv2d" || tokens[0] == "gemm") {
           op = "kernel_start";
           kernel_cmd = tokens[0];
           tokens_list.clear();
@@ -244,17 +220,27 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
           std::vector<std::string> addr_vec_tokens;
           tokenize(addr_vec_tokens, tokens[1], ",");
 
-          AddrVec_t addr_vec;
+          // FIX: Use Ramulator::AddrVec_t
+          Ramulator::AddrVec_t addr_vec;
           for (const auto& token : addr_vec_tokens) {
-            addr_vec.push_back(std::stoll(token));
+            addr_vec.push_back(std::stoi(token)); // stoi ensures int
           }
 
-          m_trace.push_back({op, addr_vec});
+          ::PIM::Trace new_trace;
+          new_trace.op = op;
+          new_trace.addr_vec = addr_vec;
+          m_trace.push_back(new_trace);
+
         } else if (op == "kernel_end") {
           op = "kernel";
-          AddrVec_t addr_vec;
+          // FIX: Use Ramulator::AddrVec_t
+          Ramulator::AddrVec_t addr_vec;
           addr_vec.push_back(m_kernels.size() - 1);
-          m_trace.push_back({op, addr_vec});
+          
+          ::PIM::Trace new_trace;
+          new_trace.op = op;
+          new_trace.addr_vec = addr_vec;
+          m_trace.push_back(new_trace);
         }
       }
 
@@ -284,4 +270,3 @@ class PimTraceKVAware : public IFrontEnd, public Implementation {
 };
 
 }  // namespace Ramulator
-

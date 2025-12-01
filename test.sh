@@ -30,7 +30,7 @@
                     --trace-output-path ./Result/Group.txt \
                     --model-debug-file ./Debug/Haha.lp \
                     --trans-coeff-method 4 \
-                    --target-device-type 0 \
+                    --target-device-type 1 \
                     --number-counting-method 0 \
                     --obj-method 0 \
                     --storage-method 0 \
