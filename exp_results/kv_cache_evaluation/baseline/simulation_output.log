@@ -1,1 +1,6 @@
-/root/KVC-PIM/experiments_scripts/kv_cache_evaluation/run_baseline.sh: line 25: /root/KVC-PIM/simulator/build/ramulator2: No such file or directory
+[Ramulator::PIM Trace KV-Aware] [info] Loading trace file /root/KVC-PIM/Result/Group.txt ...
+[Ramulator::PIM Trace KV-Aware] [info] Loaded 1 lines.
+[PimDRAMSystem] channels: 16, PEs/channel: 16, SysBW: 256 bits/cycle, PEBW: 256 bits/cycle, burst length: 4
+[Ramulator::PIM Trace KV-Aware] [info] Loaded static weight mapping from /root/KVC-PIM/Result/Group.txt
+[Ramulator::PIM Trace KV-Aware] [info] KV cache policy initialized with 256 banks
+[Ramulator::PIM Trace KV-Aware] [info] Generated 392960 KV cache operations for 512 tokens
